@@ -43,15 +43,15 @@ class Cidr:
         self.suffix = int(suffix)
         self.octets = [int(octet) for octet in self.ip.split(".")]
 
-    def get_netmask(self):
-        mask = self.suffix*"1" + (32 - self.suffix)*"0"
-        mask_bin_octets = [mask[0:8], mask[8:16], mask[16:24], mask[24:32]]
-        mask_dec_octets = [str(int("0b" + bin_octet, 2)) for bin_octet in mask_bin_octets]
-        return ".".join(mask_dec_octets)
-
     def __ip_to_decimal(self):
         octets = [int(octet) for octet in self.ip.split(".")]
         return sum([256**(3-i)*octets[i] for i in range(4)])
+
+    def get_netmask(self):
+        mask = self.suffix*"1" + (32 - self.suffix)*"0"
+        bin_octets = [mask[0:8], mask[8:16], mask[16:24], mask[24:32]]
+        dec_octets = [str(int("0b" + bin_octet, 2)) for bin_octet in bin_octets]
+        return ".".join(dec_octets)
 
 
 class WrongCidrNotation(Exception):
