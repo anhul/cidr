@@ -3,6 +3,7 @@ import re
 
 CIDR_RE = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$")
 IPV4_LENGTH = 32
+MAX_IPS = 10
 
 
 def _parse_args():
@@ -13,6 +14,11 @@ def _parse_args():
                         action="store",
                         default="",
                         help="CIDR notation")
+    parser.add_argument("--max_ips",
+                        action="store",
+                        type=int,
+                        default=None,
+                        help="Maximum number of consecutive IPs to output")
     args = parser.parse_args()
     return args
 
@@ -26,6 +32,8 @@ class Cidr:
         self.ip = ""
         self.suffix = 0
         self.octets = []
+        self.octet_host_bits_num = []
+        self.octet_min_max_host_value = []
         self._split_cidr()
 
     def _is_valid_cidr(self, cidr):
@@ -43,40 +51,42 @@ class Cidr:
         self.ip, suffix = self.cidr.split("/")
         self.suffix = int(suffix)
         self.octets = [int(octet) for octet in self.ip.split(".")]
-        self.host_bits_in_octet = self._host_bits_per_octet()
+        self.octet_host_bits_num = self._get_octet_host_bits_num()
+        self.octet_min_max_host_value = self._get_octet_min_max_host_value()
 
     def _ip_to_decimal(self):
         octets = [int(octet) for octet in self.ip.split(".")]
         return sum([256**(3-i)*octets[i] for i in range(4)])
 
-    def _host_bits_per_octet(self):
+    def _get_octet_host_bits_num(self):
         host_bits_per_octet = [0, 0, 0, 0]
-        host_bits_num = IPV4_LENGTH - self.suffix
+        host_bits_total = IPV4_LENGTH - self.suffix
         for i in range(3, -1, -1):
-            if 0 < host_bits_num <= 8:
-                host_bits_per_octet[i] = host_bits_num
+            if 0 < host_bits_total <= 8:
+                host_bits_per_octet[i] = host_bits_total
                 break
-            elif host_bits_num > 8:
+            elif host_bits_total > 8:
                 host_bits_per_octet[i] = 8
-                host_bits_num -= 8
+                host_bits_total -= 8
         return host_bits_per_octet
+    
+    def _get_octet_min_max_host_value(self):
+        min_max_host_values = []
+        for index, octet in enumerate(self.octets):
+            host_bits_num = self.octet_host_bits_num[index]
+            if host_bits_num:
+                min_value = octet & int("0b" + (8-host_bits_num)*"1" + host_bits_num*"0", 2)
+                max_value = octet | int("0b" + (8-host_bits_num)*"0" + host_bits_num*"1", 2)
+            else:
+                min_value = max_value = octet
+            min_max_host_values.append((min_value, max_value))
+        return min_max_host_values
 
     def get_first_ip(self):
-        masked_octets = self.octets.copy()
-        for index, octet in enumerate(self.octets):
-            bits_num = self.host_bits_in_octet[index]
-            if bits_num:
-                masked_octets[index] = octet & int("0b" + (8-bits_num)*"1" + bits_num*"0", 2)
-        return ".".join(map(str, masked_octets))
+        return ".".join(map(lambda x: str(x[0]), self.octet_min_max_host_value))
 
     def get_last_ip(self):
-        masked_octets = self.octets.copy()
-        for index, octet in enumerate(self.octets):
-            bits_num = self.host_bits_in_octet[index]
-            if bits_num:
-                masked_octets[index] = octet | int("0b" + (8-bits_num)*"0" + bits_num*"1", 2)
-        return ".".join(map(str, masked_octets))
-
+        return ".".join(map(lambda x: str(x[1]), self.octet_min_max_host_value))
 
     def get_netmask(self):
         mask = self.suffix*"1" + (IPV4_LENGTH - self.suffix)*"0"
@@ -87,6 +97,16 @@ class Cidr:
     def get_number_of_ips(self):
         return pow(2, IPV4_LENGTH-self.suffix)
 
+    def get_ips(self, max_ips=MAX_IPS):
+        count = 0
+        (o1_min, o1_max), (o2_min, o2_max), (o3_min, o3_max), (o4_min, o4_max) = self.octet_min_max_host_value
+        for o1 in range(o1_min, o1_max + 1):
+            for o2 in range(o2_min, o2_max + 1):
+                for o3 in range(o3_min, o3_max + 1):
+                    for o4 in range(o4_min, o4_max + 1):
+                        if count < max_ips:
+                            count += 1
+                            yield f"{o1}.{o2}.{o3}.{o4}"
 
 
 class WrongCidrNotation(Exception):
@@ -108,3 +128,11 @@ if __name__ == '__main__':
     print(f"Number of IPs: {cidr_obj.get_number_of_ips()}")
     print(f"First IP: {cidr_obj.get_first_ip()}")
     print(f"Last IP: {cidr_obj.get_last_ip()}")
+    if args.max_ips is not None:
+        print(f"First {args.max_ips} IPs:")
+        ips = cidr_obj.get_ips(args.max_ips)
+    else:
+        print(f"First {MAX_IPS} IPs:")
+        ips = cidr_obj.get_ips()
+    for ip in ips:
+        print(ip)
