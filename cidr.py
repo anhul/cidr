@@ -61,7 +61,7 @@ class Cidr:
                 host_bits_per_octet[i] = 8
                 host_bits_total -= 8
         return host_bits_per_octet
-    
+
     def _get_octets_min_max_host_value(self):
         min_max_host_values = []
         for index, octet in enumerate(self._octets):

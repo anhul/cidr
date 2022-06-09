@@ -1,4 +1,3 @@
-import pytest
 from cidr import Cidr
 
 
@@ -25,5 +24,3 @@ class TestCidr:
     def test_netmask(self):
         for item in range(self.count):
             assert self.cidrs[item].netmask == self.netmasks[item]
-
-
