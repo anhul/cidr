@@ -22,8 +22,8 @@ class TestCidr:
                 "255.255.255.255"]
     count = len(cidrs)
 
-    def test_get_netmask(self):
+    def test_netmask(self):
         for item in range(self.count):
-            assert self.cidrs[item].get_netmask() == self.netmasks[item]
+            assert self.cidrs[item].netmask == self.netmasks[item]
 
 
